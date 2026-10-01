@@ -1,0 +1,37 @@
+# Secretos y credenciales
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+secrets/
+
+# Dependencias y artefactos
+node_modules/
+__pycache__/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Datos y respaldos (nunca datos reales en el repositorio)
+*.log
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+backups/
+data/real/
+
+# Configuración local de herramientas
+.claude/settings.local.json
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

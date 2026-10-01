@@ -1,0 +1,8 @@
+# Escaneres de SOLO LECTURA permitidos al perfil `reviewer` de bash_guard.py.
+# Un comando del reviewer debe EMPEZAR por una de estas lineas.
+# Vacia a proposito: cada entrada la anade una persona tras verificar que la
+# herramienta no escribe nada, no hace red y no acepta flags de ejecucion.
+# Ejemplos de candidatos a evaluar (NO habilitados):
+#   pip-audit --dry-run
+#   npm audit --json
+#   gitleaks detect --no-git
