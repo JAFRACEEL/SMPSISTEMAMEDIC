@@ -133,6 +133,17 @@ relativa a la raíz del repositorio principal (`CLAUDE_PROJECT_DIR`). Dentro de 
 La corrección del hook la hace una persona (archivo bloqueado). Hay que añadir casos de regresión con rutas de worktree en
 `tests/guards/test_guards.py` y repetir esta ronda.
 
+**Estado (2026-10-01): corrección PROPUESTA, sin aplicar.** Está en `docs/security/proposals/` (revisión 2):
+
+- `path_guard.py`: el guard propuesto;
+- `test_worktrees.py`: 419 casos nuevos en un archivo aparte;
+- `README.md`: cambios, casos, aplicación y reversión.
+
+`test_guards.py` no se toca: `secrets_guard` impide reescribirlo desde Claude Code, porque contiene literales de prueba
+con forma de credencial. Requiere revisión humana independiente, aplicación humana con `Copy-Item`, ambas suites al 100 %
+y un commit humano. Después hay que repetir esta ronda. Hasta ese commit, los agentes en worktree siguen ejecutando el
+guard del último commit.
+
 ### Procedimiento original (referencia)
 
 Según la documentación oficial verificada el 2026-10-01, al **crear el primer archivo de

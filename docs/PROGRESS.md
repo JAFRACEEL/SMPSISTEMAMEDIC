@@ -1,7 +1,7 @@
 # Avance - SISTEMAMEDIC
 
-Quien retome el trabajo: **lee este archivo y `docs/APPROVALS.md`, y sigue en el primer ítem
-sin marcar.** Última actualización: **2026-10-01**.
+Quien retome el trabajo: **lee `docs/HANDOFF.md`, este archivo y `docs/APPROVALS.md`, y sigue en
+el primer ítem sin marcar.** Última actualización: **2026-10-01**.
 
 ## Estado general
 
@@ -18,7 +18,15 @@ sin marcar.** Última actualización: **2026-10-01**.
 | F10A-F12A | No iniciada | H10-H12 | Pendiente |
 | Oleadas B-E | No iniciadas | - | Pendiente |
 
-**Siguiente acción: una persona aprueba H1 en `docs/APPROVALS.md`.** Sin eso no se construye nada.
+**Siguiente acción:**
+
+1. Una persona revisa y aplica la corrección de `path_guard.py` (bug de worktrees), siguiendo
+   `docs/security/proposals/README.md`.
+2. Corre las dos suites de pruebas.
+3. Se repite la ronda 2 de pruebas en vivo.
+4. Una persona aprueba H1 en `docs/APPROVALS.md`.
+
+Sin H1 no se construye nada. **No avanzar a Discovery/F2.**
 
 ## SETUP - detalle
 
@@ -99,6 +107,22 @@ sin marcar.** Última actualización: **2026-10-01**.
       ejecutó). Verificación obligatoria tras reiniciar en
       `docs/security/agent-boundary-tests.md` §4b
 - [x] `docs/security/agent-boundary-tests.md`
+- [ ] **P1 ABIERTO: `path_guard.py` rechaza toda escritura dentro de un worktree** (ronda 2 de
+      pruebas en vivo, `agent-boundary-tests.md` §4). Bloquea a `backend-engineer` y a
+      `frontend-medical-ux`. El fallo es *fail-closed*: bloquea de más, no deja pasar escrituras indebidas.
+  - [x] Corrección propuesta (revisión 2), lista para revisión humana en
+        `docs/security/proposals/`:
+        - `path_guard.py`: worktrees, `.git`, endurecimiento Windows y *fail-closed* en la entrada;
+        - `test_worktrees.py`: 419 casos nuevos, por recuento estático;
+        - `README.md`: cambios, casos, aplicación y reversión.
+  - [x] Verificado solo con `py_compile`. `tests/guards/test_guards.py` y `.claude/hooks/` sin cambios.
+  - [ ] **Revisión humana técnica independiente del diff** (`CLAUDE.md` §8)
+  - [ ] **Aplicación humana** (`Copy-Item`, según el README) y ejecución de `test_guards.py`
+        (167) y `test_worktrees.py` (419), ambas al 100 %
+  - [ ] Commit humano en rama `feat/...`. Los worktrees de agentes usan el hook del último
+        commit: hasta entonces los agentes en worktree siguen con el guard viejo.
+  - [ ] Repetir la ronda 2 en vivo con `backend-engineer` y `frontend-medical-ux`
+  - [ ] Añadir `test_worktrees.py` a la CI (`devops-release-engineer`)
 - [x] `claude doctor`: sin problemas de instalación
 - [ ] **`/doctor` interactivo → PENDIENTE: lo ejecuta una persona tras reiniciar**
 
@@ -133,6 +157,7 @@ sin marcar.** Última actualización: **2026-10-01**.
 
 | # | Qué | Rol | Bloquea a |
 |---|---|---|---|
+| 0 | Revisar y aplicar `docs/security/proposals/` (corrección de `path_guard.py`); correr ambas suites y repetir la ronda 2 en vivo | Resp. técnico + revisor independiente | **H1** y los agentes en worktree |
 | 1 | Aprobar H1 en `docs/APPROVALS.md` | Dirección Médica | Todo |
 | 2 | **Reiniciar Claude Code, aceptar la confianza de la carpeta y verificar que los hooks se disparan** (`agent-boundary-tests.md` §4b) | Resp. técnico | **El enforcement por dominio** |
 | 2b | Correr las pruebas en vivo de los 10 subagentes | Resp. técnico | Confianza en los límites |
@@ -152,3 +177,6 @@ sin marcar.** Última actualización: **2026-10-01**.
 | Fecha | Qué se hizo | Resultado |
 |---|---|---|
 | 2026-10-01 | Bloque SETUP completo (S0-S11) | Completado; detenido en el gate H1 |
+| 2026-10-01 | Pruebas en vivo, rondas 1 y 2 | Hallazgo P1: `path_guard` bloquea toda escritura en worktrees |
+| 2026-10-01 | Intento de corregir `path_guard.py` desde Claude Code | Bloqueado por el propio hook (S10 funciona); no se evadió |
+| 2026-10-01 | Propuesta de corrección (revisión 2) en `docs/security/proposals/` | Lista para revisión humana; sin aplicar ni ejecutar; sin commit. H1 NO APROBADO |
