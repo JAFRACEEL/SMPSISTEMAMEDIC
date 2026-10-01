@@ -242,3 +242,28 @@ Edit(tests/guards/**)
 | 4 | Cualquier escritura en `docs/APPROVALS.md` | Prohibido por diseño; verificado que el bloqueo funciona |
 | 5 | Código de aplicación, scaffold o migraciones | Fuera del alcance del gate H1 |
 | 6 | `/doctor` interactivo | No es invocable desde una sesión de agente. `claude doctor` (CLI) se ejecutó: *"No installation issues found"*. **PENDIENTE**: una persona debe ejecutar `/doctor` dentro de una sesión interactiva tras reiniciar, para validar la configuración ya cargada |
+| 7 | Verificar en vivo los hooks globales | **No fue posible: no se disparan en la sesión que los creó.** Ver §8 |
+
+## 8. Hallazgo abierto (P1): los hooks globales no se dispararon en esta sesión
+
+Prueba realizada el 2026-10-01 en la sesión principal, después de escribir
+`.claude/settings.json`:
+
+```
+git rev-parse --git-dir     -> se ejecutó y devolvió ".git"
+```
+
+`bash_guard.py dev` **debía bloquearlo** (`--git-dir` está en `DANGEROUS_FLAGS`), y lo bloquea
+correctamente cuando se le pasa el JSON directamente (caso probado en la suite). Por tanto,
+**Claude Code no invocó el hook**.
+
+**Causa más probable**: los hooks de los archivos de configuración se cargan al **iniciar la
+sesión**, y `.claude/settings.json` se creó durante esta. Posible factor añadido: la carpeta
+no está marcada como de confianza.
+
+**Consecuencia mientras no se verifique**: el enforcement real descansa solo en
+`permissions.deny` (que sí cubre `docs/APPROVALS.md`, secretos y comandos destructivos) y
+**no** en la separación por dominio entre agentes.
+
+**Qué hacer**: seguir el procedimiento de `docs/security/agent-boundary-tests.md` §4b
+**antes** de confiar en los límites y antes de iniciar cualquier fase de construcción.

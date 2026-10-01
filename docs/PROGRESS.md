@@ -94,6 +94,10 @@ sin marcar.** Última actualización: **2026-10-01**.
 - [x] **167/167 pasadas** (se corrigieron 3 defectos en los guards, nunca el test)
 - [ ] **Pruebas en vivo con cada subagente → PENDIENTE DE REINICIO**
       (procedimiento en `docs/security/agent-boundary-tests.md` §4)
+- [ ] **P1 ABIERTO: los hooks globales de `.claude/settings.json` NO se dispararon en la
+      sesión que los creó** (probado con `git rev-parse --git-dir`, que debía bloquearse y se
+      ejecutó). Verificación obligatoria tras reiniciar en
+      `docs/security/agent-boundary-tests.md` §4b
 - [x] `docs/security/agent-boundary-tests.md`
 - [x] `claude doctor`: sin problemas de instalación
 - [ ] **`/doctor` interactivo → PENDIENTE: lo ejecuta una persona tras reiniciar**
@@ -130,7 +134,8 @@ sin marcar.** Última actualización: **2026-10-01**.
 | # | Qué | Rol | Bloquea a |
 |---|---|---|---|
 | 1 | Aprobar H1 en `docs/APPROVALS.md` | Dirección Médica | Todo |
-| 2 | Reiniciar Claude Code y correr las pruebas en vivo de los subagentes | Resp. técnico | Confianza en los límites |
+| 2 | **Reiniciar Claude Code, aceptar la confianza de la carpeta y verificar que los hooks se disparan** (`agent-boundary-tests.md` §4b) | Resp. técnico | **El enforcement por dominio** |
+| 2b | Correr las pruebas en vivo de los 10 subagentes | Resp. técnico | Confianza en los límites |
 | 3 | Ejecutar `/doctor` en sesión interactiva | Resp. técnico | Validación de configuración |
 | 4 | Contratar asesoría legal y revisor independiente | Dirección Médica | **F3** |
 | 5 | Completar `docs/CUSTODY_REGISTER.md` (dos administradores por recurso) | Dirección Médica | F4 |

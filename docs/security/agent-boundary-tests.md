@@ -21,7 +21,7 @@ Evidencia de que los guardrails **bloquean de verdad**, no solo en el prompt.
 | devops-release-engineer | `devops` | `infra/**`, `.github/**`, `scripts/**`, compose, Dockerfile | `scripts/migration/**`, todo lo demás | `dev` | **PASA** | PENDIENTE DE REINICIO |
 | data-migration-reviewer | `migration` | `docs/DATA_MIGRATION_PLAN.md`, `scripts/migration/**` | todo lo demás | no tiene | **PASA** | PENDIENTE DE REINICIO |
 | final-reviewer | `none` | ninguna | todo | `reviewer` | **PASA** | PENDIENTE DE REINICIO |
-| **sesión principal** | `main` | todo el repositorio | `docs/APPROVALS.md`, `.env*`, claves, `secrets/**`, `data/real/**`, fuera del repo | `dev` | **PASA** | **PASA** (en uso) |
+| **sesión principal** | `main` | todo el repositorio | `docs/APPROVALS.md`, `.env*`, claves, `secrets/**`, `data/real/**`, fuera del repo | `dev` | **PASA** | **PENDIENTE DE REINICIO** (ver §4b) |
 
 ## 2. Casos exigidos por el prompt (S7.1)
 
@@ -89,6 +89,48 @@ Para **cada** agente, en una sesión nueva en `C:\SMPSISTEMAMEDIC`:
    - Esperado: bloqueado por `bash_guard.py dev`.
 
 Registrar cada resultado en la tabla siguiente, **con la salida real**, no con un resumen.
+
+## 4b. Los hooks GLOBALES tampoco están activos en esta sesión - **verificación obligatoria**
+
+**Hallazgo del 2026-10-01, abierto.** Tras escribir `.claude/settings.json`, se probó en la
+sesión principal el comando `git rev-parse --git-dir`, que `bash_guard.py dev` **debe
+bloquear** (la bandera `--git-dir` está en `DANGEROUS_FLAGS`). **El comando se ejecutó.**
+
+Es decir: en esta sesión, los hooks `PreToolUse` declarados en `.claude/settings.json`
+**no se dispararon**.
+
+**Causa más probable**: Claude Code carga los hooks de los archivos de configuración al
+**iniciar la sesión**. El archivo `.claude/settings.json` se creó *durante* esta sesión, por
+lo que no estaba presente al arrancar. A esto se suma que los hooks de un repositorio pueden
+requerir que la **carpeta esté marcada como de confianza**.
+
+**No es un defecto de los guards**: los tres hooks funcionan correctamente cuando se les pasa
+el JSON (167/167 en `tests/guards/test_guards.py`). El problema es que Claude Code todavía no
+los está invocando en esta sesión.
+
+**Mientras no se verifique, el enforcement real descansa solo en `permissions.deny`**, que sí
+cubre `docs/APPROVALS.md`, los archivos de secretos y los comandos destructivos, pero **no**
+cubre la separación por dominio entre agentes.
+
+### Verificación obligatoria tras reiniciar (hazla ANTES de confiar en los límites)
+
+1. Cierra Claude Code y vuelve a abrirlo en `C:\SMPSISTEMAMEDIC`.
+2. **Acepta el diálogo de confianza de la carpeta** si aparece. Es imprescindible para que
+   corran los hooks del frontmatter de los subagentes del proyecto.
+3. En la sesión principal, pide ejecutar: `git rev-parse --git-dir`
+   - **Esperado**: bloqueado, con `[bash_guard] BLOQUEADO: la bandera '--git-dir' no esta permitida.`
+   - Si **se ejecuta**, los hooks siguen sin cargar: revisa `/hooks` y el log de depuración
+     (`claude --debug`), y comprueba que el intérprete `python` se resuelve.
+4. Pide escribir el archivo `prueba_guard.txt` **fuera** del repositorio (por ejemplo
+   `C:\prueba_guard.txt`).
+   - **Esperado**: bloqueado por `path_guard.py`.
+5. Ejecuta `/doctor` y resuelve cualquier configuración duplicada o inválida que señale.
+6. Anota el resultado en la tabla de §4 y marca este hallazgo como cerrado.
+
+> Si tras el reinicio los hooks siguen sin dispararse, la alternativa es moverlos a la
+> configuración de usuario (`~/.claude/settings.json`) o revisar la forma de invocación
+> (`command` + `args` frente a una sola cadena). Es un cambio en archivo bloqueado: lo hace
+> una persona siguiendo `docs/SETUP_DECISIONS.md` §6.
 
 ### Registro de pruebas en vivo
 
