@@ -104,6 +104,35 @@ Verificación humana: **PENDIENTE**. Ningún hook ni ajuste se modificó durante
 3. `clinical-workflow-reviewer` y `final-reviewer` no tienen Write ni Edit. La restricción de herramientas del frontmatter
    es en sí una capa de protección, pero estas pruebas no ejercitan `path_guard.py none`.
 
+### Ronda 2 (2026-10-01): agentes con worktree, rutas dentro de su propio worktree
+
+Ejecutó: sesión principal de Claude Code, invocando a cada subagente con la herramienta Agent.
+Verificación humana: **PENDIENTE**. Ningún hook ni ajuste se modificó.
+Criterio: OK solo si lo permitido se ejecuta y lo bloqueado lo bloquea `path_guard` (no el aislamiento de worktree).
+
+| Agente | Ruta usada | Esperado | Obtenido | Quién decidió | OK/FALLO | Mensaje exacto |
+|---|---|---|---|---|---|---|
+| backend-engineer | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-aac493ef25af37e59\backend\app\_prueba_ok.py` | PERMITIDO | BLOQUEADO | path_guard | **FALLO** | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" backend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-aac493ef25af37e59/backend/app/_prueba_ok.py esta fuera del dominio 'backend'. Rutas permitidas: backend/**` |
+| backend-engineer | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-aac493ef25af37e59\frontend\src\_prueba.ts` | BLOQUEADO (path_guard) | BLOQUEADO | path_guard | OK (motivo indebido, ver nota) | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" backend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-aac493ef25af37e59/frontend/src/_prueba.ts esta fuera del dominio 'backend'. Rutas permitidas: backend/**` |
+| backend-engineer | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-aac493ef25af37e59\backend\tests\_prueba.py` | BLOQUEADO (path_guard) | BLOQUEADO | path_guard | OK (motivo indebido, ver nota) | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" backend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-aac493ef25af37e59/backend/tests/_prueba.py esta fuera del dominio 'backend'. Rutas permitidas: backend/**` |
+| backend-engineer | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-aac493ef25af37e59\backend\migrations\_prueba.py` | BLOQUEADO (path_guard) | BLOQUEADO | path_guard | OK (motivo indebido, ver nota) | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" backend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-aac493ef25af37e59/backend/migrations/_prueba.py esta fuera del dominio 'backend'. Rutas permitidas: backend/**` |
+| frontend-medical-ux | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-ae9bf516e70a7dea0\frontend\src\_prueba_ok.ts` | PERMITIDO | BLOQUEADO | path_guard | **FALLO** | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" frontend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-ae9bf516e70a7dea0/frontend/src/_prueba_ok.ts esta fuera del dominio 'frontend'. Rutas permitidas: frontend/src/**, frontend/public/**` |
+| frontend-medical-ux | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-ae9bf516e70a7dea0\backend\app\_prueba.py` | BLOQUEADO (path_guard) | BLOQUEADO | path_guard | OK (motivo indebido, ver nota) | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" frontend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-ae9bf516e70a7dea0/backend/app/_prueba.py esta fuera del dominio 'frontend'. Rutas permitidas: frontend/src/**, frontend/public/**` |
+| frontend-medical-ux | `C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-ae9bf516e70a7dea0\frontend\tests\_prueba.ts` | BLOQUEADO (path_guard) | BLOQUEADO | path_guard | OK (motivo indebido, ver nota) | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" frontend]: [path_guard] BLOQUEADO: .claude/worktrees/agent-ae9bf516e70a7dea0/frontend/tests/_prueba.ts esta fuera del dominio 'frontend'. Rutas permitidas: frontend/src/**, frontend/public/**` |
+
+**Hallazgo abierto (ronda 2): `path_guard.py` rechaza toda escritura dentro de un worktree.** El hook calcula la ruta
+relativa a la raíz del repositorio principal (`CLAUDE_PROJECT_DIR`). Dentro de un worktree, esa ruta conserva el prefijo
+`.claude/worktrees/agent-<id>/` y no coincide con ningún patrón de dominio. Consecuencias:
+
+- `backend-engineer` y `frontend-medical-ux` **no pueden escribir nada** en su worktree, ni siquiera en su propio dominio.
+  El ciclo por feature (`CLAUDE.md` §6), que los ejecuta en paralelo en worktrees, queda bloqueado.
+- Los bloqueos "correctos" de esta ronda **no prueban** las reglas de dominio. `backend/tests/**` y `backend/migrations/**`
+  dentro de `backend/**` no se rechazan por sus exclusiones, sino porque la ruta entera queda fuera de cualquier dominio.
+- El fallo es de tipo *fail-closed*: bloquea de más, no deja pasar escrituras indebidas.
+
+La corrección del hook la hace una persona (archivo bloqueado). Hay que añadir casos de regresión con rutas de worktree en
+`tests/guards/test_guards.py` y repetir esta ronda.
+
 ### Procedimiento original (referencia)
 
 Según la documentación oficial verificada el 2026-10-01, al **crear el primer archivo de
