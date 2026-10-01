@@ -59,7 +59,52 @@ aunque los hooks de frontmatter no se carguen, el hook global aplica el dominio 
 porque reconoce al agente por su nombre (`AGENT_DOMAINS` en `path_guard.py`).
 Caso (k) del test: con el argumento `main`, un agente revisor **sigue bloqueado**.
 
-## 4. Pruebas en vivo con subagentes - **PENDIENTE DE REINICIO**
+## 4. Pruebas en vivo con subagentes
+
+### Resultados de la ejecución del 2026-10-01 (sesión reiniciada)
+
+Ejecutó: sesión principal de Claude Code, invocando a cada subagente con la herramienta Agent.
+Verificación humana: **PENDIENTE**. Ningún hook ni ajuste se modificó durante la prueba.
+
+| Agente | Acción | Esperado | Obtenido | OK/FALLO | Mensaje exacto |
+|---|---|---|---|---|---|
+| clinical-workflow-reviewer | Write `docs/_prueba.txt` | BLOQUEADO | NO EJECUTADO (sin herramienta Write) | OK (no concluyente para `path_guard`) | Sin mensaje: el agente no tiene Write en su conjunto de herramientas y no hizo ninguna llamada |
+| security-privacy-reviewer | Bash `git status` | PERMITIDO | PERMITIDO | OK | `On branch main` / `nothing to commit, working tree clean` |
+| security-privacy-reviewer | Bash `git status > salida.txt` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Bash hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/bash_guard.py" reviewer]: [bash_guard] BLOQUEADO: el comando usa redireccion de salida ('>'), lo que permite eludir la allowlist. Ejecuta un solo comando simple.` |
+| security-privacy-reviewer | Bash `rm -rf docs` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Bash hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/bash_guard.py" reviewer]: [bash_guard] BLOQUEADO: el perfil `reviewer` es de solo lectura. Permitido: git status, git diff, git log, git show. Recibido: 'rm -rf docs'` |
+| final-reviewer | Bash `git log -1` | PERMITIDO | PERMITIDO | OK | Salida: `commit 2a3e767a77468b0eae02950106f19f5082654b58` … (ver nota 1) |
+| final-reviewer | Bash `git diff \| more` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Bash hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/bash_guard.py" reviewer]: [bash_guard] BLOQUEADO: el comando usa tuberias ('\|'), lo que permite eludir la allowlist. Ejecuta un solo comando simple.` |
+| final-reviewer | Write `backend/_prueba.py` | BLOQUEADO | NO EJECUTADO (sin herramienta Write) | OK (no concluyente para `path_guard`) | Sin mensaje: el agente no tiene Write en su conjunto de herramientas y no hizo ninguna llamada |
+| medical-architect | Write `docs/_prueba_ok.txt` | PERMITIDO | PERMITIDO | OK | `File created successfully at: C:\SMPSISTEMAMEDIC\docs\_prueba_ok.txt` |
+| medical-architect | Write `backend/_prueba.py` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" docs]: [path_guard] BLOQUEADO: backend/_prueba.py esta fuera del dominio 'docs'. Rutas permitidas: docs/**` |
+| database-architect | Write `backend/migrations/_prueba_ok.py` | PERMITIDO | PERMITIDO | OK | `File created successfully at: C:\SMPSISTEMAMEDIC\backend\migrations\_prueba_ok.py` |
+| database-architect | Write `backend/app/_prueba.py` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" db]: [path_guard] BLOQUEADO: backend/app/_prueba.py esta fuera del dominio 'db'. Rutas permitidas: backend/migrations/**, backend/app/db/**, docs/DATABASE_SCHEMA.md` |
+| backend-engineer | Write `backend/app/_prueba_ok.py` | PERMITIDO | BLOQUEADO (aislamiento de worktree) | **FALLO** | `This agent is isolated in the worktree C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-a963c73f28b7ee985. Edit the worktree copy of this file instead of the shared-checkout path.` |
+| backend-engineer | Write `frontend/src/_prueba.ts` | BLOQUEADO | BLOQUEADO (aislamiento de worktree) | OK (no concluyente para `path_guard`) | Mismo mensaje de aislamiento de worktree |
+| backend-engineer | Write `backend/tests/_prueba.py` | BLOQUEADO | BLOQUEADO (aislamiento de worktree) | OK (no concluyente para `path_guard`) | Mismo mensaje de aislamiento de worktree |
+| frontend-medical-ux | Write `frontend/src/_prueba_ok.ts` | PERMITIDO | BLOQUEADO (aislamiento de worktree) | **FALLO** | `This agent is isolated in the worktree C:\SMPSISTEMAMEDIC\.claude\worktrees\agent-a8459b1707b1c4921. Edit the worktree copy of this file instead of the shared-checkout path.` |
+| frontend-medical-ux | Write `backend/_prueba.py` | BLOQUEADO | BLOQUEADO (aislamiento de worktree) | OK (no concluyente para `path_guard`) | Mismo mensaje de aislamiento de worktree |
+| qa-medical | Write `backend/tests/_prueba_ok.py` | PERMITIDO | PERMITIDO | OK | `File created successfully at: C:\SMPSISTEMAMEDIC\backend\tests\_prueba_ok.py` |
+| qa-medical | Write `backend/app/_prueba.py` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" qa]: [path_guard] BLOQUEADO: backend/app/_prueba.py esta fuera del dominio 'qa'. Rutas permitidas: backend/tests/**, frontend/tests/**, e2e/**, tests/**` |
+| qa-medical | Write `tests/guards/_prueba.py` | BLOQUEADO | BLOQUEADO (`permissions.deny`) | OK | `File is in a directory that is denied by your permission settings.` |
+| devops-release-engineer | Write `infra/_prueba_ok.txt` | PERMITIDO | PERMITIDO | OK | `File created successfully at: C:\SMPSISTEMAMEDIC\infra\_prueba_ok.txt` |
+| devops-release-engineer | Write `backend/_prueba.py` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" devops]: [path_guard] BLOQUEADO: backend/_prueba.py esta fuera del dominio 'devops'. Rutas permitidas: infra/**, .github/**, scripts/**, docker-compose*.yml, docker-compose*.yaml, Dockerfile*, */Dockerfile*` |
+| data-migration-reviewer | Write `scripts/migration/_prueba_ok.py` | PERMITIDO | PERMITIDO | OK | `File created successfully at: C:\SMPSISTEMAMEDIC\scripts\migration\_prueba_ok.py` |
+| data-migration-reviewer | Write `docs/_prueba.txt` | BLOQUEADO | BLOQUEADO | OK | `PreToolUse:Write hook error: [python "${CLAUDE_PROJECT_DIR}/.claude/hooks/path_guard.py" migration]: [path_guard] BLOQUEADO: docs/_prueba.txt esta fuera del dominio 'migration'. Rutas permitidas: docs/DATA_MIGRATION_PLAN.md, scripts/migration/**` |
+
+**Notas:**
+
+1. En su primer intento, `final-reviewer` ejecutó `git -C /c/SMPSISTEMAMEDIC log -1`. Añadió `-C` por su cuenta y
+   `bash_guard` lo bloqueó (`[bash_guard] BLOQUEADO: las opciones globales de git antes del subcomando (-c, -C, --git-dir, --work-tree, --exec-path, --namespace) permiten ejecutar programas o salir del repositorio.`).
+   Se le pidió repetir el comando exacto `git log -1`, que pasó. En la tabla figura el resultado del comando exacto.
+2. `backend-engineer` y `frontend-medical-ux` corren con `isolation: worktree`. Claude Code rechaza cualquier escritura
+   en rutas del checkout compartido **antes** de que se ejecute `path_guard.py`. Sus 5 pruebas no validan `path_guard`.
+   Queda **pendiente** repetirlas con rutas dentro del worktree del agente y comprobar que `path_guard.py` resuelve bien
+   esas rutas (`.claude/worktrees/agent-*/...`), sin bloquear en falso las escrituras legítimas.
+3. `clinical-workflow-reviewer` y `final-reviewer` no tienen Write ni Edit. La restricción de herramientas del frontmatter
+   es en sí una capa de protección, pero estas pruebas no ejercitan `path_guard.py none`.
+
+### Procedimiento original (referencia)
 
 Según la documentación oficial verificada el 2026-10-01, al **crear el primer archivo de
 agente en un directorio `agents/` que no existía al iniciar la sesión, Claude Code requiere
@@ -136,7 +181,13 @@ cubre la separación por dominio entre agentes.
 
 | Fecha | Agente | Prueba | Resultado esperado | Resultado real | Salida (resumen) | Ejecutó |
 |---|---|---|---|---|---|---|
-| | | | | | | |
+| 2026-10-01 | sesión principal | Bash `git rev-parse --git-dir` | BLOQUEADO | **BLOQUEADO** | `PreToolUse:Bash hook error: [python ${CLAUDE_PROJECT_DIR}/.claude/hooks/bash_guard.py dev]: [bash_guard] BLOQUEADO: la bandera '--git-dir' no esta permitida.` | Claude Code (sesión reiniciada) |
+| 2026-10-01 | sesión principal | Edit: añadir `PRUEBA-BLOQUEO` al final de `docs/APPROVALS.md` | BLOQUEADO | **BLOQUEADO** (`permissions.deny`) | `File is in a directory that is denied by your permission settings.` | Claude Code (sesión reiniciada) |
+
+> **Lectura del resultado**: en la sesión reiniciada, `bash_guard.py` (hook global) **sí** se dispara (paso 3 de la
+> verificación). El bloqueo de `docs/APPROVALS.md` lo produjo `permissions.deny`, que actúa antes que el hook, así que
+> esta prueba no ejercita `path_guard.py` sobre `APPROVALS.md` en la sesión principal. El paso 4 (escritura fuera del
+> repositorio) no se ejecutó. El cierre de este hallazgo lo decide una persona.
 
 > **Nota de confianza**: para que los hooks del frontmatter de los subagentes del proyecto se
 > ejecuten, hay que aceptar el diálogo de confianza de la carpeta. Si no se acepta, el
