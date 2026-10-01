@@ -15,7 +15,7 @@
 
 | Gate | Alcance | Estado | Aprobador (nombre y rol) | Fecha | Evidencia |
 |---|---|---|---|---|---|
-| H1 | F0 + F1 técnica: entorno Claude Code, agentes, skills, guardrails, borradores F0 | PENDIENTE | | | |
+| H1 | F0 + F1 técnica: entorno Claude Code, agentes, skills, guardrails, borradores F0 | APROBADO | Franco López — Responsable del proyecto | 2026-10-01 | `tests/guards/test_guards.py`: 319/319 PASS; `git diff --check`: sin errores; validación live de dominios backend/frontend en worktrees; A5 aceptado como riesgo residual |
 | H2 | Discovery F2 completado y validado | PENDIENTE | | | |
 | H3 | ADR de arquitectura aprobados (F3) | PENDIENTE | | | |
 | H4 | F4 + F4b: scaffold, CI, backup/restore probado, staging aprovisionado | PENDIENTE | | | |
@@ -68,3 +68,14 @@ Los ADR se aprueban en `docs/ADR/`. Esta tabla replica su estado para el control
 | ADR-007 | Idioma/i18n y zona horaria | PROPUESTO | | |
 | ADR-008 | Almacenamiento de adjuntos | PROPUESTO | | |
 | ADR-009 | Entornos staging y PROD (aprovisionamiento, TLS, dominio, vault) | PROPUESTO | | |
+
+### Evidencia H1 — 2026-10-01
+
+**Aprobado por:** Franco López — Responsable del proyecto
+
+- 319/319 pruebas de guardrails aprobadas.
+- `git diff --check` sin errores.
+- `backend-engineer`: permite backend y bloquea frontend en worktree.
+- `frontend-medical-ux`: permite frontend y bloquea backend en worktree.
+- Pruebas de regresión añadidas para worktrees, `.git`, traversal, Windows, ADS, symlink/junction y fail-closed.
+- A5 permanece como riesgo residual documentado y aceptado.
