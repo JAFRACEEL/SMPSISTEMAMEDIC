@@ -1,0 +1,171 @@
+# CI de SISTEMAMEDIC. Falla cerrada: cualquier paso rojo bloquea la fusión.
+# Sin pasos de despliegue: el deploy es solo CI/CD con aprobación humana (docs/APPROVALS.md).
+# Solo datos sintéticos. No se imprimen secretos.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_ENV: ci
+  # Valores efímeros de CI, sin relación con ningún entorno real.
+  POSTGRES_DB: sm_ci
+  POSTGRES_USER: sm_ci
+  POSTGRES_PASSWORD: ci-ephemeral-not-a-secret
+
+jobs:
+  # 1. Lint
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/pyproject.toml }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Lint backend (ruff)
+        working-directory: backend
+        run: |
+          pip install -e ".[dev]"
+          ruff check .
+          ruff format --check .
+      - name: Lint frontend (eslint)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+
+  # 2. Typecheck
+  typecheck:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/pyproject.toml }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: mypy
+        working-directory: backend
+        run: |
+          pip install -e ".[dev]"
+          mypy .
+      - name: tsc
+        working-directory: frontend
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+  # 3. Tests (incluye tests/guards/test_guards.py)
+  test:
+    needs: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sm_ci
+          POSTGRES_USER: sm_ci
+          POSTGRES_PASSWORD: ci-ephemeral-not-a-secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sm_ci -d sm_ci" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://sm_ci:ci-ephemeral-not-a-secret@localhost:5432/sm_ci
+      APP_SECRET_KEY: ci-ephemeral-not-a-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/pyproject.toml }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Guards (hooks de agentes)
+        run: |
+          pip install pytest
+          python -m pytest tests/guards/test_guards.py -v
+      - name: pytest backend
+        working-directory: backend
+        run: |
+          pip install -e ".[dev]"
+          python -m pytest -v
+      - name: Pruebas unitarias frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test --if-present
+      - name: Playwright (E2E sintético)
+        working-directory: frontend
+        # Supuesto: script "test:e2e" definido por qa-medical/frontend.
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
+  # 4. Build
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Build imágenes DEV (sin publicar)
+        run: |
+          docker build -f infra/docker/Dockerfile.backend -t sm-backend:ci .
+          docker build -f infra/docker/Dockerfile.frontend -t sm-frontend:ci .
+
+  # 5. Escaneo de dependencias
+  dependency-scan:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: pip-audit
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          pip install -e .
+          pip-audit
+      - name: npm audit
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --audit-level=high
+
+  # 6. Escaneo de secretos (diff e historial completo)
+  secret-scan:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # historial completo
+      - name: gitleaks (historial)
+        # --redact evita imprimir el secreto en el log.
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            detect --source /repo --redact --no-banner --verbose

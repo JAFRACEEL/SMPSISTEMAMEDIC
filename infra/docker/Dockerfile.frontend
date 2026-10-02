@@ -1,0 +1,13 @@
+# Imagen de frontend SOLO DEV (servidor Vite). Contexto de build: raíz del repositorio.
+FROM node:22-alpine
+
+WORKDIR /app
+# Supuesto: frontend/package.json y package-lock.json existen.
+COPY frontend/package.json frontend/package-lock.json* /app/
+RUN npm ci || npm install
+
+COPY frontend/ /app/
+RUN chown -R node:node /app
+USER node
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
