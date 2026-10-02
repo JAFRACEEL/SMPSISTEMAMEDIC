@@ -1,100 +1,71 @@
 # Handoff - SISTEMAMEDIC
 
-**Fecha: 2026-10-01.** Para quien retome, sea una persona o una nueva sesión de Claude Code.
-Léelo junto con `docs/PROGRESS.md` (estado general) y `docs/APPROVALS.md` (gates).
+**Fecha: 2026-10-02.** Para quien retome, sea una persona o una nueva sesión de Claude Code.
+Léelo junto con `docs/PROGRESS.md` y `docs/APPROVALS.md`.
 
-## Dónde estamos
+## Estado actual
 
-- **Fase:** SETUP (F0 + F1 técnica) completada. Detenidos en el **gate H1, que NO está aprobado**.
-- **Rama:** `main`. No hay commits nuevos desde `117e777`.
-- **Bloqueante abierto, P1:** `path_guard.py` rechaza toda escritura dentro de un worktree
-  (`.claude/worktrees/agent-<hex>/...`). Por eso `backend-engineer` y `frontend-medical-ux`
-  (`isolation: worktree`) no pueden escribir ni en su propio dominio. La evidencia está en
-  `docs/security/agent-boundary-tests.md` §4, ronda 2.
+- **Rama:** `feat/base-tecnica`. **HEAD:** `41da8df`. `git status` limpio.
+- **H1: CERRADO Y APROBADO HUMANAMENTE.** 319/319 guardrails PASS, `git diff --check` limpio.
+  A5 queda como riesgo residual aceptado y documentado. No reabrir H1 salvo regresión real.
+- **F2 Discovery: EN CURSO.** **H2 NO está aprobado.** Bloque 1b pendiente de respuestas de Franco.
+  Bloque 2 registrado como NO DEFINIDO / pendiente. No inventar datos de la IPRESS.
 
-## Qué se hizo en esta sesión
+## Base técnica: INTEGRADA, NO VALIDADA
 
-1. Claude Code intentó corregir `.claude/hooks/path_guard.py` y **el propio hook lo bloqueó**:
-   `.claude/hooks/**` está en `PROTECTED_ALL`, así que el bloqueo S10 funciona. **No se evadió.**
-2. Por indicación del usuario (opción A, edición humana), la corrección se dejó como
-   **propuesta** en `docs/security/proposals/`:
+Integración manual en `feat/base-tecnica`:
 
-   | Archivo | Destino | Contenido |
-   |---|---|---|
-   | `path_guard.py` | `.claude/hooks/path_guard.py` | Guard completo, revisión 2 |
-   | `test_worktrees.py` | `tests/guards/test_worktrees.py` (nuevo) | 419 casos nuevos (recuento estático) |
-   | `README.md` | se queda | CAMBIOS DE SEGURIDAD, PRUEBAS NUEVAS, aplicación, reversión y riesgos |
+| Parte | Commit de agente | Merge |
+|---|---|---|
+| Backend | `2ddc472` | `e099fd4` |
+| Frontend (parcial) | `c9a55ee` | `39923f5` |
+| Infra / CI | `4b1e98a` | `41da8df` |
 
-3. Lo que cubre la revisión 2:
-   - resolución de worktrees, validando `gitdir` y el puntero de vuelta;
-   - `CLAUDE_PROJECT_DIR` apuntando a un worktree;
-   - bloqueo de `..` en worktrees, de worktrees anidados o falsos y de escapes por symlink o junction
-     (comparando `normpath` con `realpath`);
-   - protección de `.git`;
-   - endurecimiento Windows: punto o espacio final, ADS (`:`), nombres cortos 8.3, nombres de
-     dispositivo (incluido `Con.tsx`), UNC y comodines, evaluado solo en el tramo bajo la raíz;
-   - *fail-closed* ante JSON ilegible o escrituras sin ruta;
-   - `classify()` exige que el `.git` del worktree apunte a esta raíz.
-4. **`tests/guards/test_guards.py` no se toca.** Sus 167 casos siguen idénticos
-   (`git diff --stat HEAD` vacío). No se pudo copiar a `proposals/` porque contiene literales de prueba con
-   forma de credencial y `secrets_guard` lo bloquea. Por eso los casos nuevos van en un archivo aparte.
-5. Verificación hecha: **solo** `python -m py_compile` sobre las dos propuestas, sin errores.
-   **Las pruebas NO se ejecutaron**, por instrucción del usuario.
-6. Documentos sincronizados: `docs/PROGRESS.md` (checklist, pendientes y bitácora) y
-   `docs/security/agent-boundary-tests.md` (estado del hallazgo).
+Los tres worktrees de implementación se eliminaron tras comprobar que estaban limpios; no hay
+worktrees activos aparte del principal. (Las ramas locales `worktree-agent-*` aún existen como ramas.)
+Nota de cierre: `git worktree list --porcelain` lo bloqueó `bash_guard` en esta sesión; la ausencia de
+worktrees se toma del cierre manual previo, no de una verificación nueva.
 
-## Siguiente paso: solo personas
+Contenido integrado:
 
-Desde `C:\SMPSISTEMAMEDIC`, en una rama `feat/path-guard-worktrees` (no en `main`):
+- **Backend:** `backend/README.md`, `backend/app/`, `backend/pyproject.toml`.
+- **Frontend (parcial):** `frontend/public/`, `frontend/src/`. Faltan configs raíz de `frontend/`:
+  `package.json`, `package-lock.json`, `vite.config.*`, `tsconfig*.json`, `index.html`, `eslint.config.*`.
+- **Infra/CI:** `.github/workflows/ci.yml`, `docker-compose.yml`, `infra/docker/`, `infra/env/dev.env.example`.
 
-```powershell
-# 1. Revisión humana técnica independiente del diff (CLAUDE.md §8)
-git diff --no-index .claude\hooks\path_guard.py docs\security\proposals\path_guard.py
+**Aún no se ha ejecutado como conjunto:** backend, frontend, Docker Compose, CI, pruebas integradas,
+revisión Codex y revisión final.
 
-# 2. Aplicar
-Copy-Item docs\security\proposals\path_guard.py .claude\hooks\path_guard.py
-Copy-Item docs\security\proposals\test_worktrees.py tests\guards\test_worktrees.py
+## Pendientes técnicos
 
-# 3. Probar: ambas al 100 %; si falla algo se corrige el guard, nunca el test
-python tests\guards\test_guards.py
-python tests\guards\test_worktrees.py
+- **P1 Ownership frontend:** `frontend-medical-ux` necesita acceso controlado a ciertos archivos de
+  `frontend/`. No ampliar permisos a `package.json` de la raíz del repo. Cambio mínimo en `path_guard`,
+  con tests de regresión, aplicado por una persona.
+- **P2 Health endpoint:** inconsistencia frontend `/api/health` vs backend `/health`. Unificar antes de validar.
+- **P3 `.env.example`:** no relajar la protección global de `.env*`. Existe `infra/env/dev.env.example`.
+  Si se crea `/.env.example`, excepción exacta solo para ese archivo.
+- **P4 Line endings:** avisos "LF will be replaced by CRLF". Evaluar `.gitattributes` con `eol=lf`
+  (sobre todo Docker/CI).
+- **P5 Backup/restore:** falta script/procedimiento.
+- **P6 GitHub:** falta protección de rama.
+- **P7 Validación integrada:** ver lista arriba.
 
-# Revertir si hace falta
-git restore .claude/hooks/path_guard.py
-Remove-Item tests\guards\test_worktrees.py
-```
+## Orden de la próxima sesión
 
-Después:
+1. Leer este archivo. 2. Verificar `git status` y rama. 3. Resolver ownership frontend.
+4. Completar scaffold frontend. 5. Resolver `.env.example`. 6. Unificar health endpoint.
+7. Crear/validar `.gitattributes`. 8. Backup/restore mínimo. 9. Ejecutar backend. 10. Ejecutar frontend.
+11. Ejecutar Docker Compose. 12. Tests/CI local si es posible. 13. Revisión Codex/diff.
+14. Corregir hallazgos. 15. Continuar Discovery F2 en paralelo. 16. No aprobar H2 hasta validar Discovery real.
 
-1. Commit humano en la rama. Hasta ese commit, los agentes en worktree siguen ejecutando el
-   guard del último commit.
-2. Repetir la ronda 2 en vivo con `backend-engineer` y `frontend-medical-ux`.
-3. Añadir `test_worktrees.py` a la CI (`devops-release-engineer`).
-4. Aprobar H1 en `docs/APPROVALS.md` (Dirección Médica).
+## NO HACER
 
-## Restricciones vigentes (del usuario)
+- No reconstruir H1, no recrear worktrees antiguos, no reaplicar patches de H1.
+- No ampliar `bash_guard` por comodidad.
+- No usar `git clean` indiscriminadamente.
+- No programar módulos clínicos todavía.
+- No inventar datos institucionales.
+- No marcar H2 aprobado.
+- No usar datos reales de pacientes.
 
-- No modificar rutas protegidas: `.claude/hooks/**`, `.claude/settings.json`,
-  `.claude/agents/**`, `tests/guards/**`, `docs/APPROVALS.md`, `.env*`, `.git/**`.
-- No desactivar hooks, no usar bypass, no hacer commit sin que lo pidan, no hacer push.
-- **No avanzar a Discovery/F2.** **No declarar H1 listo.**
-- No ejecutar las pruebas contra el repo sin autorización explícita (solo `py_compile`).
-  Ejecutar la suite propuesta contra el guard propuesto, usando solo `%TEMP%`, quedó **ofrecido y sin respuesta**.
-
-## Riesgos y temas abiertos
-
-- **Sin cubrir por la propuesta:** carrera TOCTOU (entre la decisión del hook y la escritura),
-  hardlinks, y lo que hacen por dentro los scripts lanzados con `python -m`, `pytest` o `npm run` (riesgo A5).
-- `.claude/settings.json` aparece como modificado en el working tree desde **antes** de esta sesión.
-  No lo tocó Claude Code. Una persona debe revisarlo.
-- `docs/security/proposals/__pycache__/` lo generó `py_compile`. Está ignorado por `.gitignore` y se puede borrar a mano.
-- `%TEMP%\path_guard.diff` está en UTF-16. Para regenerarlo en UTF-8:
-  `git diff --no-index .claude\hooks\path_guard.py docs\security\proposals\path_guard.py | Out-File -Encoding utf8 $env:TEMP\path_guard.diff`
-  Ojo: ese diff es anterior a la revisión 2, así que conviene regenerarlo.
-- La memoria persistente de Claude Code (`~/.claude/projects/.../memory/`) **no se pudo guardar**:
-  `path_guard` bloquea toda escritura fuera del repo. Es correcto que lo haga, así que el único
-  traspaso es este archivo. Si se quiere usar esa memoria, hay que decidir si `path_guard` debe
-  permitir esa ruta (cambio en un archivo protegido, lo hace una persona).
-- Siguen pendientes los ítems humanos de `docs/PROGRESS.md` (custodia, asesor legal, Docker, etc.).
-
-**PROPUESTA LISTA PARA REVISIÓN HUMANA. H1 NO APROBADO.**
+**BASE TÉCNICA INTEGRADA, NO VALIDADA. H1 APROBADO. H2 NO APROBADO.**
