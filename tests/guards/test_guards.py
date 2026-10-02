@@ -142,7 +142,7 @@ def test_b_fuera_de_dominio():
         ("backend", "backend/tests/test_x.py"),
         ("backend", "frontend/src/App.tsx"),
         ("frontend", "backend/app/main.py"),
-        ("frontend", "frontend/package.json"),
+        ("frontend", "package.json"),
         ("qa", "backend/app/main.py"),
         ("qa", "tests/guards/test_guards.py"),
         ("devops", "scripts/migration/cargar.py"),
@@ -559,7 +559,9 @@ def test_m_worktree_valido():
              None),
             ("frontend", "frontend-medical-ux", "backend/app/x.py", BLOCK,
              "fuera del dominio"),
-            ("frontend", "frontend-medical-ux", "frontend/package.json", BLOCK,
+            ("frontend", "frontend-medical-ux", "frontend/package.json", ALLOW,
+             None),
+            ("frontend", "frontend-medical-ux", "package.json", BLOCK,
              "fuera del dominio"),
         ]
         for proyecto, etiqueta in ((wt, "CPD=worktree"), (r.main, "CPD=raiz")):
@@ -989,6 +991,74 @@ def test_u_fail_closed():
         _fail_closed("raiz con .git como archivo no verificable", principal)
 
 
+# --------------------------------------------------------------------------
+# (v) frontend-medical-ux: configuracion de frontend/ por allowlist exacta
+# --------------------------------------------------------------------------
+def test_v_frontend_config():
+    print("\n(v) frontend-medical-ux: configs de frontend/ por allowlist exacta")
+    agente = "frontend-medical-ux"
+    permitidas = [
+        "frontend/src/main.tsx",
+        "frontend/public/favicon.svg",
+        "frontend/package.json",
+        "frontend/package-lock.json",
+        "frontend/vite.config.ts",
+        "frontend/vite.config.js",
+        "frontend/tsconfig.json",
+        "frontend/tsconfig.app.json",
+        "frontend/index.html",
+        "frontend/eslint.config.js",
+    ]
+    fuera_de_dominio = [
+        "package.json",
+        "vite.config.ts",
+        "tsconfig.json",
+        "backend/package.json",
+        "infra/package.json",
+        "docs/package.json",
+        ".claude/package.json",
+        # Fuera del alcance de P1: siguen bloqueadas hasta demostrar que se necesitan.
+        "frontend/tailwind.config.js",
+        "frontend/postcss.config.js",
+        "frontend/Dockerfile",
+        "frontend/sub/package.json",
+        "frontend/package.json.bak",
+        "frontend/tests/x.spec.ts",
+        "frontend/node_modules/x/package.json",
+    ]
+    protegidas = [
+        "tests/guards/package.json",
+        ".claude/hooks/package.json",
+        "frontend/.env",
+    ]
+    # Mismo resultado con el dominio del argumento y con el hook global
+    # (el agente manda sobre el argumento).
+    for dom in ("frontend", "main"):
+        for ruta in permitidas:
+            expect_in("%s [arg=%s] permite %s" % (agente, dom, ruta), ROOT,
+                      dom, ruta, ALLOW, agent_type=agente)
+        for ruta in fuera_de_dominio:
+            expect_in("%s [arg=%s] bloquea %s" % (agente, dom, ruta), ROOT,
+                      dom, ruta, BLOCK, agent_type=agente,
+                      motivo="fuera del dominio")
+        for ruta in protegidas:
+            expect_in("%s [arg=%s] bloquea %s" % (agente, dom, ruta), ROOT,
+                      dom, ruta, BLOCK, agent_type=agente,
+                      motivo="ruta protegida")
+    # Ningun otro agente gana acceso a frontend/package.json.
+    otros = [
+        ("docs", "medical-architect"),
+        ("db", "database-architect"),
+        ("backend", "backend-engineer"),
+        ("qa", "qa-medical"),
+        ("devops", "devops-release-engineer"),
+    ]
+    for dom, otro in otros:
+        expect_in("%s no escribe frontend/package.json" % otro, ROOT, dom,
+                  "frontend/package.json", BLOCK, agent_type=otro,
+                  motivo="fuera del dominio")
+
+
 def main():
     print("Pruebas de guardrails - SISTEMAMEDIC")
     print("Raiz del proyecto: %s" % ROOT)
@@ -1017,6 +1087,7 @@ def main():
     test_s_nombre_corto_83()
     test_t_dispositivos_y_rutas_extendidas()
     test_u_fail_closed()
+    test_v_frontend_config()
 
     total = len(_results)
     fallos = [r for r in _results if not r[0]]

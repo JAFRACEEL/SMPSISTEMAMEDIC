@@ -56,7 +56,16 @@ DOMAIN_ALLOW = {
         "docs/DATABASE_SCHEMA.md",
     ],
     "backend": ["backend/**"],
-    "frontend": ["frontend/src/**", "frontend/public/**"],
+    "frontend": [
+        "frontend/src/**",
+        "frontend/public/**",
+        "frontend/package.json",
+        "frontend/package-lock.json",
+        "frontend/vite.config.*",
+        "frontend/tsconfig*.json",
+        "frontend/index.html",
+        "frontend/eslint.config.*",
+    ],
     "qa": [
         "backend/tests/**",
         "frontend/tests/**",
