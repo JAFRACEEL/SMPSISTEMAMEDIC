@@ -1,0 +1,14 @@
+# Política de fin de línea (Windows + Docker + Python + frontend).
+# Git decide texto/binario por sí mismo; lo sensible se fuerza a LF en el repositorio
+# y en la copia de trabajo (un CRLF rompe scripts de shell y Dockerfiles en contenedores Linux).
+* text=auto
+
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.py text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf

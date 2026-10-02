@@ -1,0 +1,18 @@
+# Contexto de build = raíz del repositorio. Nada de dependencias del host, secretos ni historial.
+# (Un node_modules de Windows copiado a la imagen Linux rompe los binarios nativos de Vite/Tailwind.)
+.git
+.github
+.claude
+docs
+tests
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+.env
+.env.*
+**/.env
+**/.env.*

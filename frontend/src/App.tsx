@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { consultarSalud, ErrorHttp } from "./lib/http";
 import { formatearFechaLima } from "./lib/fechas";
 
@@ -10,20 +10,28 @@ type Estado =
 export default function App() {
   const [estado, setEstado] = useState<Estado>({ tipo: "cargando" });
 
-  const verificar = useCallback(async () => {
-    setEstado({ tipo: "cargando" });
-    try {
-      const r = await consultarSalud();
-      setEstado({ tipo: "ok", estado: r.status, consultadoUtc: new Date().toISOString() });
-    } catch (e) {
-      const mensaje = e instanceof ErrorHttp ? e.message : "Error inesperado.";
-      setEstado({ tipo: "error", mensaje });
-    }
-  }, []);
+  const [intento, setIntento] = useState(0);
 
+  // El estado inicial ya es "cargando"; los cambios de estado ocurren en los callbacks
+  // de la promesa, y `activo` descarta respuestas de una consulta ya reemplazada o desmontada.
   useEffect(() => {
-    void verificar();
-  }, [verificar]);
+    let activo = true;
+    consultarSalud()
+      .then((r) => {
+        if (activo) {
+          setEstado({ tipo: "ok", estado: r.status, consultadoUtc: new Date().toISOString() });
+        }
+      })
+      .catch((e: unknown) => {
+        if (activo) {
+          const mensaje = e instanceof ErrorHttp ? e.message : "Error inesperado.";
+          setEstado({ tipo: "error", mensaje });
+        }
+      });
+    return () => {
+      activo = false;
+    };
+  }, [intento]);
 
   return (
     <main className="mx-auto max-w-xl p-6">
@@ -46,7 +54,10 @@ export default function App() {
         </div>
         <button
           type="button"
-          onClick={() => void verificar()}
+          onClick={() => {
+            setEstado({ tipo: "cargando" });
+            setIntento((n) => n + 1);
+          }}
           className="mt-3 rounded bg-blue-800 px-4 py-2 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-400"
         >
           Reintentar

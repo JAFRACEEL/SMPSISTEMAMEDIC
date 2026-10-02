@@ -5,7 +5,8 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings, utcnow
 from app.core.logging import configure_logging, request_id_var
@@ -22,7 +23,8 @@ def create_app() -> FastAPI:
     async def request_context(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        # El request_id siempre lo genera el servidor: no se acepta del cliente (evita inyección en logs).
+        # El request_id lo genera siempre el servidor: no se acepta del cliente (evita inyección
+        # en logs).
         rid = uuid.uuid4().hex
         token = request_id_var.set(rid)
         start = time.perf_counter()
@@ -51,12 +53,25 @@ def create_app() -> FastAPI:
         request_id_var.reset(token)
         return response
 
-    @app.get("/health")
+    # CORS mínimo para DEV: orígenes explícitos (sin comodín), solo lectura, sin credenciales.
+    # En DEV el frontend usa el proxy de Vite (mismo origen); esto cubre el acceso directo.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET"],
+        allow_headers=["Accept", "Content-Type"],
+        allow_credentials=False,
+    )
+
+    # Contrato único: toda la API vive bajo /api.
+    api = APIRouter(prefix="/api")
+
+    @api.get("/health")
     async def health() -> dict[str, str]:
         """Liveness: el proceso responde."""
         return {"status": "ok"}
 
-    @app.get("/ready")
+    @api.get("/ready")
     async def ready() -> dict[str, object]:
         """Readiness. Aún sin dependencias reales (BD pendiente): informa su estado."""
         return {
@@ -64,6 +79,8 @@ def create_app() -> FastAPI:
             "checks": {"database": "not_configured"},
             "time_utc": utcnow().isoformat(),
         }
+
+    app.include_router(api)
 
     return app
 

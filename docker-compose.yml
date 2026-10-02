@@ -1,5 +1,5 @@
 # SISTEMAMEDIC - entorno DEV local. Solo datos sintéticos. NO usar en staging ni PROD.
-# Secretos: solo por .env (ver .env.example). Puertos no privilegiados, enlazados a 127.0.0.1.
+# Secretos: solo por .env (copiar infra/env/dev.env.example a .env). Puertos no privilegiados, enlazados a 127.0.0.1.
 name: sistemamedic-dev
 
 services:
@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sistemamedic_dev}
       POSTGRES_USER: ${POSTGRES_USER:-sm_dev}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env (plantilla en infra/env/dev.env.example)}
       TZ: UTC
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
@@ -26,10 +26,12 @@ services:
       context: .
       dockerfile: infra/docker/Dockerfile.backend
     environment:
-      APP_ENV: ${APP_ENV:-dev}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      APP_SECRET_KEY: ${APP_SECRET_KEY:?Defina APP_SECRET_KEY en .env}
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sm_dev}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sistemamedic_dev}
+      SMD_ENVIRONMENT: ${SMD_ENVIRONMENT:-dev}
+      SMD_LOG_LEVEL: ${SMD_LOG_LEVEL:-INFO}
+      # Lista JSON, sin comodín. Compose no pasa al contenedor las variables de .env que no se listan aquí.
+      SMD_CORS_ORIGINS: ${SMD_CORS_ORIGINS:-["http://localhost:5173","http://127.0.0.1:5173"]}
+      SMD_SECRET_KEY: ${SMD_SECRET_KEY:?Defina SMD_SECRET_KEY en .env (plantilla en infra/env/dev.env.example)}
+      SMD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sm_dev}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sistemamedic_dev}
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,8 +40,8 @@ services:
     volumes:
       - ./backend:/app
     healthcheck:
-      # Supuesto: el backend expone GET /health.
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      # Contrato único: GET /api/health.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).status == 200 else 1)"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -51,7 +53,8 @@ services:
       context: .
       dockerfile: infra/docker/Dockerfile.frontend
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      # El navegador llama a /api en el mismo origen; Vite lo reenvía al servicio backend.
+      SMD_DEV_PROXY_TARGET: http://backend:8000
     depends_on:
       backend:
         condition: service_healthy

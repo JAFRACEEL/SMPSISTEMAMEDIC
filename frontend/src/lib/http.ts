@@ -1,4 +1,5 @@
 // Cliente HTTP mínimo. Sin auth, sin cookies, sin PHI en URL ni en logs.
+// Toda la API vive bajo /api (contrato: GET /api/health). En DEV, Vite lo reenvía al backend.
 const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "/api";
 const TIEMPO_MAXIMO_MS = 8000;
 

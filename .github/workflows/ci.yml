@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  APP_ENV: ci
+  SMD_ENVIRONMENT: ci
   # Valores efímeros de CI, sin relación con ningún entorno real.
   POSTGRES_DB: sm_ci
   POSTGRES_USER: sm_ci
@@ -63,9 +63,10 @@ jobs:
           mypy .
       - name: tsc
         working-directory: frontend
+        # tsconfig.json es solo de referencias: se necesita el modo build (tsc -b).
         run: |
           npm ci
-          npx tsc --noEmit
+          npm run typecheck
 
   # 3. Tests (incluye tests/guards/test_guards.py)
   test:
@@ -84,8 +85,8 @@ jobs:
           --health-cmd "pg_isready -U sm_ci -d sm_ci" --health-interval 5s
           --health-timeout 3s --health-retries 10
     env:
-      DATABASE_URL: postgresql+psycopg://sm_ci:ci-ephemeral-not-a-secret@localhost:5432/sm_ci
-      APP_SECRET_KEY: ci-ephemeral-not-a-secret
+      SMD_DATABASE_URL: postgresql+psycopg://sm_ci:ci-ephemeral-not-a-secret@localhost:5432/sm_ci
+      SMD_SECRET_KEY: ci-ephemeral-not-a-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -108,10 +109,9 @@ jobs:
           npm test --if-present
       - name: Playwright (E2E sintético)
         working-directory: frontend
-        # Supuesto: script "test:e2e" definido por qa-medical/frontend.
-        run: |
-          npx playwright install --with-deps chromium
-          npm run test:e2e
+        # PENDIENTE (qa-medical): Playwright aún no es dependencia ni existe el script "test:e2e".
+        # Al añadirlo, agregar aquí `npx playwright install --with-deps chromium`.
+        run: npm run test:e2e --if-present
 
   # 4. Build
   build:
